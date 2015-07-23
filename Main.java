@@ -1,5 +1,7 @@
 package com.company;
 
+import java.io.IOException;
+
 /**
  * Main class.
  * <p/>
@@ -21,8 +23,6 @@ public class Main
         System.setProperty("user.dir", "C:\\Program Files (x86)\\ArcGIS SDKs\\java10.2.4\\");
 
         InfoFrame infoFrame = new InfoFrame();
-        MapDisplay mapDisplay = new MapDisplay();
-        mapDisplay.setVisible(true);
 
         infoFrame.startLoop();
     }

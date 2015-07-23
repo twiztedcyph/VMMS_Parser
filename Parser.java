@@ -9,7 +9,8 @@ import java.awt.*;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.text.ParseException;
-import java.util.ArrayList;
+import java.util.*;
+import java.util.List;
 
 /**
  * Parser class.
@@ -22,12 +23,15 @@ public class Parser
 {
     private LineReader lineReader;
     private DateTime startDate, dateTime;
-    private double startLat, startLong, latitude, longitude, totalDistance, distFromStart;
-    private int timeSkipper = 240;
-    private ArrayList<Double> timeList, speedList, rpmList;
-    private ArrayList<String> dayTimeList;
+    private double startLat, startLong, latitude, longitude, totalDistance, distFromStart, sectionSpeed, rpm;
+    private int timeSkipper = 15;
+    private List<Double> timeList;
+    private List<Double> speedList;
+    private List<Double> rpmList;
+    private List<String> dayTimeList;
     private LineReader.Line line;
     private Seconds seconds;
+    private MapDisplay mapDisplay;
 
     /**
      * Parser constructor.
@@ -38,6 +42,12 @@ public class Parser
     {
         try
         {
+            //Storage lists for writing output csv.
+            timeList = Collections.synchronizedList(new ArrayList<Double>());
+            speedList = Collections.synchronizedList(new ArrayList<Double>());
+            rpmList = Collections.synchronizedList(new ArrayList<Double>());
+            dayTimeList = Collections.synchronizedList(new ArrayList<String>());
+
             //Line reader init and get the first usable line.
             lineReader = new LineReader(fileName);
             //First line for distance from base and time from start calculations.
@@ -54,11 +64,15 @@ public class Parser
             latitude = startLat;
             longitude = startLong;
 
-            //Storage lists for writing output csv.
-            timeList = new ArrayList<>();
-            speedList = new ArrayList<>();
-            rpmList = new ArrayList<>();
-            dayTimeList = new ArrayList<>();
+            try
+            {
+                mapDisplay = new MapDisplay();
+                mapDisplay.setVisible(true);
+                mapDisplay.startTimer();
+            }catch (IOException e)
+            {
+                e.printStackTrace();
+            }
 
         } catch (IOException | ParseException e)
         {
@@ -81,16 +95,24 @@ public class Parser
 
         latitude = line.getLatitude();
         longitude = line.getLongitude();
+        mapDisplay.setCurrentPos(latitude, longitude);
 
-        double sectionSpeed = sectionDist / (sectionSeconds.getSeconds() * 0.000277778);
-        speedList.add(Double.isNaN(sectionSpeed) ? 0 : sectionSpeed);
+        sectionSpeed = sectionDist / ((sectionSeconds.getSeconds() + 1) * 0.000277778);
+        System.out.println(sectionDist + " over " + (sectionSeconds.getSeconds() + 1)* 0.000277778 + " = " + sectionSpeed);
+
 
         double mcr = Math.exp(0.149993656 * sectionSpeed);
 
 
-        double rpm = 12 * mcr + 800;
+        rpm = 12 * mcr + 800;
 
-        rpmList.add(rpm);
+
+
+        synchronized (this)
+        {
+            speedList.add(Double.isNaN(sectionSpeed) ? 0 : sectionSpeed);
+            rpmList.add(rpm);
+        }
 
         distFromStart = getDistance(startLat, startLong, line.getLatitude(), line.getLongitude());
 
@@ -111,14 +133,15 @@ public class Parser
                      */
                     for (int j = 0; j < timeList.size() && j < speedList.size(); j++)
                     {
-                        fileWriter.write(String.format("%s, %f, %f, %f\n",
-                                                       dayTimeList.get(i),
-                                                       timeList.get(i),
-                                                       speedList.get(i),
-                                                       rpmList.get(i)));
+                        synchronized (this)
+                        {
+                            fileWriter.write(String.format("%s, %f, %f, %f\n", dayTimeList.get(i),
+                                                                                timeList.get(i),
+                                                                                speedList.get(i),
+                                                                                rpmList.get(i)));
+                        }
                     }
-
-                    System.exit(0);
+                    System.exit(1);
                 }
             } catch (IOException | ParseException e)
             {
@@ -145,11 +168,15 @@ public class Parser
         g2d.drawString("DATE/TIME:", 100, 30);
         DateTimeFormatter out = DateTimeFormat.forPattern("dd/MM/yyyy HH:mm:ss");
         g2d.drawString(String.format("%s", out.print(line.getDate())), 250, 30);
-        dayTimeList.add(out.print(line.getDate()));
+
 
         g2d.drawString("ELAPSED:", 550, 30);
         g2d.drawString(String.format("%-4.1f hours @ %dx speed", seconds.getSeconds() * 0.000277778, (timeSkipper / 15)), 680, 30);
-        timeList.add(seconds.getSeconds() * 0.000277778);
+        synchronized (this)
+        {
+            dayTimeList.add(out.print(line.getDate()));
+            timeList.add(seconds.getSeconds() * 0.000277778);
+        }
 
         //Pitch, roll, heave and heading display.
         g2d.drawString("PITCH", 100, 70);
@@ -183,6 +210,12 @@ public class Parser
 
         g2d.drawString("DISTANCE FROM BASE:", 100, 410);
         g2d.drawString(String.format("%f", distFromStart), 390, 410);
+
+        g2d.drawString("CURRENT SPEED:", 600, 380);
+        g2d.drawString(String.format("%f", sectionSpeed), 890, 380);
+
+        g2d.drawString("CURRENT RPM:", 600, 410);
+        g2d.drawString(String.format("%f", rpm), 890, 410);
     }
 
     /**
