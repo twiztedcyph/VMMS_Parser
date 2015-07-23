@@ -83,7 +83,8 @@ public class InfoFrame extends Canvas
             {
             }
         });
-        parser = new Parser("CsvData220315.csv");
+        //CsvData220315.csv
+        parser = new Parser("CsvData160315_Edit.csv");
 
 
         //Start the simulation loop.

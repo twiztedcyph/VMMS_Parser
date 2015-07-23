@@ -1,11 +1,16 @@
 package com.company;
 
+import com.esri.client.local.LocalMapService;
+import com.esri.client.local.WorkspaceInfo;
+import com.esri.client.local.WorkspaceInfoSet;
 import com.esri.core.geometry.*;
 import com.esri.core.geometry.Point;
-import com.esri.core.map.Graphic;
+import com.esri.core.map.*;
+import com.esri.core.renderer.SimpleRenderer;
 import com.esri.core.symbol.PictureMarkerSymbol;
 import com.esri.core.symbol.SimpleLineSymbol;
 import com.esri.map.*;
+import com.esri.runtime.ArcGISRuntime;
 
 import javax.imageio.ImageIO;
 import javax.swing.*;
@@ -21,7 +26,7 @@ import java.io.IOException;
 /**
  * Map display class.
  * <p/>
- * Will attempt to use ArcGIS for this as google was too limited in allowed api calls.
+ * With ArcGIS.
  *
  * @author Ian Weeks (09/07/2015).
  */
@@ -29,6 +34,7 @@ public class MapDisplay extends JFrame
 {
     private JMap map;
     private int pointerID, lineID, counter;
+    private volatile int count = 0;
     private double currentLat, currentLong;
     private boolean firstUpdate = true;
     private Timer timer;
@@ -36,6 +42,9 @@ public class MapDisplay extends JFrame
     private SimpleLineSymbol simpleLineSymbol;
     private Polyline polyline;
     private SpatialReference sr;
+    private SimpleRenderer simpleRenderer = new SimpleRenderer(new SimpleLineSymbol(new Color(0, 100, 250), 3));
+    private final int TRANSPARENCY = 20; // 0 is opaque, 100 is transparent
+    private final String FSP = System.getProperty("file.separator");
 
     public MapDisplay() throws IOException
     {
@@ -63,6 +72,73 @@ public class MapDisplay extends JFrame
 
         simpleLineSymbol = new SimpleLineSymbol(Color.green, 3, SimpleLineSymbol.Style.DASH);
 
+        // create a local map service and enable dynamic layers
+        LocalMapService localMapService = new LocalMapService(
+                getPathSampleData() + "mpks" + FSP + "mpk_blank.mpk");
+        localMapService.setEnableDynamicLayers(true);
+
+        // get dynamic workspaces from service
+        WorkspaceInfoSet workspaceInfoSet = localMapService.getDynamicWorkspaces();
+
+        WorkspaceInfo workspaceInfo = WorkspaceInfo.CreateShapefileFolderConnection(
+                "WORKSPACE", "C:\\Users\\Cypher\\Dropbox\\Java Projects\\VMMS_Parser");
+
+        // set dynamic workspaces for our local map service
+        workspaceInfoSet.add(workspaceInfo);
+        localMapService.setDynamicWorkspaces(workspaceInfoSet);
+
+        // now start service...
+        localMapService.start();
+
+        // set up a local dynamic layer
+        final ArcGISDynamicMapServiceLayer localDynamicLayer = new ArcGISDynamicMapServiceLayer(
+                localMapService.getUrlMapService());
+
+        // add the layer to the map
+        map.getLayers().add(localDynamicLayer);
+
+        localDynamicLayer
+                .addLayerInitializeCompleteListener(new LayerInitializeCompleteListener()
+                {
+                    @Override
+                    public void layerInitializeComplete(LayerInitializeCompleteEvent arg0)
+                    {
+                        if (arg0.getID() == LayerInitializeCompleteEvent.LOCALLAYERCREATE_ERROR)
+                        {
+                            String errMsg = "Failed to initialize due to "
+                                    + localDynamicLayer.getInitializationError();
+                            showErrorMsg(errMsg);
+                        }
+                        DynamicLayerInfoCollection layerInfos = localDynamicLayer
+                                .getDynamicLayerInfos();
+                        DynamicLayerInfo layerInfo = layerInfos.get(0);
+
+            /*
+             * Apply a renderer for dynamic layers. Note: It is always necessary
+             * to provide a renderer, but the renderer provided does not need to
+             * be valid with regard to the actual layer and geometry type, it
+             * simply needs to be a valid renderer. If the renderer specified
+             * here is not appropriate for the geometry type of the layer the
+             * symbology will fall back to a default SimpleMarkerSymbol,
+             * SimpleLineSymbol or SimpleFillSymbol.
+             */
+                        DrawingInfo drawingInfo = new DrawingInfo(simpleRenderer,
+                                TRANSPARENCY);
+                        layerInfo.setDrawingInfo(drawingInfo);
+
+                        // Create the data source
+                        TableDataSource dataSource = new TableDataSource();
+                        dataSource.setWorkspaceId("WORKSPACE");
+                        dataSource.setDataSourceName("GREATER GABBARD.shp");
+
+                        // Set the data source
+                        LayerDataSource layerDataSource = new LayerDataSource();
+                        layerDataSource.setDataSource(dataSource);
+                        layerInfo.setLayerSource(layerDataSource);
+
+                        localDynamicLayer.refresh();
+                    }
+                });
 
         map.addMapEventListener(new MapEventListenerAdapter()
         {
@@ -112,7 +188,7 @@ public class MapDisplay extends JFrame
                 counter++;
 
 
-                if (counter > 100)
+                if (counter > 10 && map.isReady())
                 {
                     if (firstUpdate)
                     {
@@ -150,5 +226,30 @@ public class MapDisplay extends JFrame
     public void startTimer()
     {
         timer.start();
+    }
+
+    private String getPathSampleData()
+    {
+        String dataPath = null;
+        String javaPath = ArcGISRuntime.getInstallDirectory();
+        if (javaPath != null)
+        {
+            if (!(javaPath.endsWith("/") || javaPath.endsWith("\\")))
+            {
+                javaPath += FSP;
+            }
+            dataPath = javaPath + "sdk" + FSP + "samples" + FSP + "data" + FSP;
+        }
+        File dataFile = new File(dataPath);
+        if (!dataFile.exists())
+        {
+            dataPath = ".." + FSP + "data" + FSP;
+        }
+        return dataPath;
+    }
+
+    private void showErrorMsg(String message)
+    {
+        JOptionPane.showMessageDialog(null, message, "", JOptionPane.ERROR_MESSAGE);
     }
 }
