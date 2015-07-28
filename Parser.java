@@ -15,15 +15,16 @@ import java.util.List;
 /**
  * Parser class.
  *
- * @author Ian Weeks, Max Bloy (09/07/2015).
- * @author Max Bloy
- * @author Amine Hajier
+ * @author Ian Weeks (09/07/2015).
+ * @author Dr Tony Bagnall - Formulae and formulae derivations.
+ * @author Amine Hajier - Formulae and formulae derivations.
  */
 public class Parser
 {
     private LineReader lineReader;
     private DateTime startDate, dateTime;
-    private double startLat, startLong, latitude, longitude, totalDistance, distFromStart, sectionSpeed, rpm;
+    private double startLat, startLong, latitude, longitude,
+            totalDistance, distFromStart, sectionSpeed, rpm;
     private int timeSkipper = 15;
     private List<Double> timeList;
     private List<Double> speedList;
@@ -86,35 +87,36 @@ public class Parser
      */
     public void update()
     {
-        seconds = Seconds.secondsBetween(startDate, line.getDate());
-        Seconds sectionSeconds = Seconds.secondsBetween(dateTime, line.getDate());
-        dateTime = line.getDate();
-
-        double sectionDist = getDistance(latitude, longitude, line.getLatitude(), line.getLongitude());
-        totalDistance += sectionDist;
-
-        latitude = line.getLatitude();
-        longitude = line.getLongitude();
-        mapDisplay.setCurrentPos(latitude, longitude);
-
-        sectionSpeed = sectionDist / ((sectionSeconds.getSeconds() + 1) * 0.000277778);
-        System.out.println(sectionDist + " over " + (sectionSeconds.getSeconds() + 1)* 0.000277778 + " = " + sectionSpeed);
-
-
-        double mcr = Math.exp(0.149993656 * sectionSpeed);
-
-
-        rpm = 12 * mcr + 800;
-
-
-
-        synchronized (this)
+        if (line != null)
         {
-            speedList.add(Double.isNaN(sectionSpeed) ? 0 : sectionSpeed);
-            rpmList.add(rpm);
-        }
+            seconds = Seconds.secondsBetween(startDate, line.getDate());
+            Seconds sectionSeconds = Seconds.secondsBetween(dateTime, line.getDate());
+            dateTime = line.getDate();
 
-        distFromStart = getDistance(startLat, startLong, line.getLatitude(), line.getLongitude());
+            double sectionDist = getDistance(latitude, longitude, line.getLatitude(), line.getLongitude());
+            totalDistance += sectionDist;
+
+            latitude = line.getLatitude();
+            longitude = line.getLongitude();
+            mapDisplay.setCurrentPos(latitude, longitude);
+
+            sectionSpeed = sectionDist / ((sectionSeconds.getSeconds() + 1) * 0.000277778);
+
+            double mcr = Math.exp(0.149993656 * sectionSpeed);
+
+
+            rpm = 12 * mcr + 800;
+
+
+
+            synchronized (this)
+            {
+                speedList.add(Double.isNaN(sectionSpeed) ? 0 : sectionSpeed);
+                rpmList.add(rpm);
+            }
+
+            distFromStart = getDistance(startLat, startLong, line.getLatitude(), line.getLongitude());
+        }
 
         for (int i = 0; i < 1 + (timeSkipper); i++)
         {
@@ -131,7 +133,9 @@ public class Parser
                     At this point write the stored data to a file and
                     exit the program.
                      */
-                    for (int j = 0; j < timeList.size() && j < speedList.size(); j++)
+                    for (int j = 0;
+                         j < timeList.size() && j < speedList.size() && j < dayTimeList.size() && j < rpmList.size();
+                         j++)
                     {
                         synchronized (this)
                         {
@@ -171,7 +175,8 @@ public class Parser
 
 
         g2d.drawString("ELAPSED:", 550, 30);
-        g2d.drawString(String.format("%-4.1f hours @ %dx speed", seconds.getSeconds() * 0.000277778, (timeSkipper / 15)), 680, 30);
+        g2d.drawString(String.format("%-4.1f hours @ %dx speed",
+                                     seconds.getSeconds() * 0.000277778, (timeSkipper / 15)), 680, 30);
         synchronized (this)
         {
             dayTimeList.add(out.print(line.getDate()));
@@ -212,14 +217,14 @@ public class Parser
         g2d.drawString(String.format("%f", distFromStart), 390, 410);
 
         g2d.drawString("CURRENT SPEED:", 600, 380);
-        g2d.drawString(String.format("%f", sectionSpeed), 890, 380);
+        g2d.drawString(String.format("%f", sectionSpeed), 860, 380);
 
         g2d.drawString("CURRENT RPM:", 600, 410);
-        g2d.drawString(String.format("%f", rpm), 890, 410);
+        g2d.drawString(String.format("%f", rpm), 860, 410);
     }
 
     /**
-     *
+     * Increase the simulation speed.
      */
     public void increaseParseSpeed()
     {
@@ -230,7 +235,7 @@ public class Parser
     }
 
     /**
-     *
+     * Decrease the simulation speed.
      */
     public void decreaseParseSpeed()
     {

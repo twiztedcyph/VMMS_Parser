@@ -1,6 +1,8 @@
 package com.company;
 
 import javax.swing.*;
+import javax.swing.filechooser.FileFilter;
+import javax.swing.filechooser.FileNameExtensionFilter;
 import java.awt.*;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
@@ -26,6 +28,17 @@ public class InfoFrame extends Canvas
      */
     public InfoFrame()
     {
+        JFileChooser jFileChooser = new JFileChooser();
+        jFileChooser.setDialogTitle("File selection");
+        FileFilter filter = new FileNameExtensionFilter("csv files", "csv");
+        jFileChooser.setFileFilter(filter);
+        int choice = jFileChooser.showDialog(null, "Select");
+
+        if (choice == JFileChooser.CANCEL_OPTION)
+        {
+            System.exit(0);
+        }
+
         //Window title, close operation, dimension setup.
         JFrame jFrame = new JFrame("Vessel Travel Simulation");
 
@@ -84,7 +97,9 @@ public class InfoFrame extends Canvas
             }
         });
         //CsvData220315.csv
-        parser = new Parser("CsvData160315_Edit.csv");
+
+
+        parser = new Parser(jFileChooser.getSelectedFile().getAbsolutePath());
 
 
         //Start the simulation loop.

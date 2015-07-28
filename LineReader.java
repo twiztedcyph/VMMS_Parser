@@ -4,19 +4,24 @@ import org.joda.time.DateTime;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
 
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
+import java.io.IOException;
 import java.text.ParseException;
+import java.util.LinkedList;
 
 /**
  * LineReader class.
  *
  * Reads a text file line by line until the end.
  *
- * @author Ian Weeks, Max Bloy (09/07/2015).
+ * @author Ian Weeks (09/07/2015).
+ * @author Max Bloy (07/07/2015).
  */
 public class LineReader
 {
-    private BufferedReader reader;
+    private LinkedList<Line> lineList;
 
     /**
      * LineReader constructor.
@@ -28,32 +33,24 @@ public class LineReader
     {
         File inputData = new File(filePath);
 
-        reader = new BufferedReader(new FileReader(inputData));
 
+        BufferedReader reader = new BufferedReader(new FileReader(inputData));
+
+        lineList = new LinkedList<>();
         //Skip the first line which only contains column titles.
         reader.readLine();
-    }
 
-    /**
-     * Get the next line of the file.
-     *
-     * @return The next line.
-     * @throws IOException If the file cannot be read.
-     * @throws ParseException If the information cannot be parsed.
-     */
-    public Line getNextLine() throws IOException, ParseException
-    {
-        //Formatter to correctly parse date time from the file.
         DateTimeFormatter format = DateTimeFormat.forPattern("dd/MM/yyyy HH:mm:ss.SSS");
         String nextLine;
 
-        if ((nextLine = reader.readLine()) != null)
+        //Load the entire file into memory.
+        while ((nextLine = reader.readLine()) != null)
         {
             //Split the file at each comma.
             String[] splitLine = nextLine.split(",");
 
             //Return a Line object. Felt this was clearer than returning a raw array.
-            return new Line
+            Line line = new Line
                     (
                             format.parseDateTime(splitLine[0] + " " + splitLine[1]),
                             Double.parseDouble(splitLine[2]),
@@ -66,14 +63,38 @@ public class LineReader
                             Double.parseDouble(splitLine[23]),
                             Double.parseDouble(splitLine[24])
                     );
+            lineList.add(line);
         }
-        //If the line is null, i.e. The reader has reached the end... Close the buffered read stream and return null.
+
+        /*
+         * If the line is null, i.e. The reader has reached the end
+         * of the file. Close the buffered read stream and return null.
+         */
         reader.close();
+        System.out.printf("Lines loaded: %d.\n", lineList.size());
+    }
+
+    /**
+     * Get the next line of the file.
+     *
+     * @return The next line.
+     * @throws IOException If the file cannot be read.
+     * @throws ParseException If the information cannot be parsed.
+     */
+    public Line getNextLine() throws IOException, ParseException
+    {
+        System.out.println(lineList.size());
+        if (!lineList.isEmpty())
+        {
+            return lineList.removeFirst();
+        }
         return null;
     }
 
     /**
      * Line class.
+     *
+     * Clarity only.
      */
     public class Line
     {

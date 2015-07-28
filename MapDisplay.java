@@ -32,9 +32,10 @@ import java.io.IOException;
  */
 public class MapDisplay extends JFrame
 {
+    private final int TRANSPARENCY = 20; // 0 is opaque, 100 is transparent
+    private final String FSP = System.getProperty("file.separator");
     private JMap map;
     private int pointerID, lineID, counter;
-    private volatile int count = 0;
     private double currentLat, currentLong;
     private boolean firstUpdate = true;
     private Timer timer;
@@ -43,12 +44,20 @@ public class MapDisplay extends JFrame
     private Polyline polyline;
     private SpatialReference sr;
     private SimpleRenderer simpleRenderer = new SimpleRenderer(new SimpleLineSymbol(new Color(0, 100, 250), 3));
-    private final int TRANSPARENCY = 20; // 0 is opaque, 100 is transparent
-    private final String FSP = System.getProperty("file.separator");
+    private PictureMarkerSymbol pms;
 
+    /**
+     * MapDisplay class.
+     *
+     * ArcGIS api used exclusively for map display.
+     *
+     * Quick disclaimer... This was my first time using the API...
+     *
+     * @throws IOException If the image file cannot be found or read.
+     */
     public MapDisplay() throws IOException
     {
-        final Image pointerImage = ImageIO.read(new File("red_dot.png"));
+        final Image pointerImage = ImageIO.read(new File("RedShinyPin.png"));
         this.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
         this.setTitle("Vessel Location");
         this.setLocation(1020, 0);
@@ -81,7 +90,7 @@ public class MapDisplay extends JFrame
         WorkspaceInfoSet workspaceInfoSet = localMapService.getDynamicWorkspaces();
 
         WorkspaceInfo workspaceInfo = WorkspaceInfo.CreateShapefileFolderConnection(
-                "WORKSPACE", "C:\\Users\\Cypher\\Dropbox\\Java Projects\\VMMS_Parser");
+                "WORKSPACE", "C:\\Users\\Twiz\\Dropbox\\Java Projects\\VMMS_Parser");
 
         // set dynamic workspaces for our local map service
         workspaceInfoSet.add(workspaceInfo);
@@ -109,9 +118,9 @@ public class MapDisplay extends JFrame
                                     + localDynamicLayer.getInitializationError();
                             showErrorMsg(errMsg);
                         }
-                        DynamicLayerInfoCollection layerInfos = localDynamicLayer
+                        DynamicLayerInfoCollection layerInfoCollection = localDynamicLayer
                                 .getDynamicLayerInfos();
-                        DynamicLayerInfo layerInfo = layerInfos.get(0);
+                        DynamicLayerInfo layerInfo = layerInfoCollection.get(0);
 
             /*
              * Apply a renderer for dynamic layers. Note: It is always necessary
@@ -123,7 +132,7 @@ public class MapDisplay extends JFrame
              * SimpleLineSymbol or SimpleFillSymbol.
              */
                         DrawingInfo drawingInfo = new DrawingInfo(simpleRenderer,
-                                TRANSPARENCY);
+                                                                  TRANSPARENCY);
                         layerInfo.setDrawingInfo(drawingInfo);
 
                         // Create the data source
@@ -148,23 +157,24 @@ public class MapDisplay extends JFrame
                 if (map.isReady())
                 {
                     System.out.println(String.format("MinX: %f\n", map.getExtent().getXMin()) +
-                            String.format("MinY: %f\n", map.getExtent().getYMin()) +
-                            String.format("MaxX: %f\n", map.getExtent().getXMax()) +
-                            String.format("MaxY: %f\n", map.getExtent().getYMax()) +
-                            String.format("Cent: %f\t%f\n", map.getExtent().getCenter().getX(),
-                                    map.getExtent().getCenter().getY()));
+                                               String.format("MinY: %f\n", map.getExtent().getYMin()) +
+                                               String.format("MaxX: %f\n", map.getExtent().getXMax()) +
+                                               String.format("MaxY: %f\n", map.getExtent().getYMax()) +
+                                               String.format("Cent: %f\t%f\n", map.getExtent().getCenter().getX(),
+                                                             map.getExtent().getCenter().getY()));
                 }
             }
 
             @Override
             public void mapReady(MapEvent event)
             {
-                PictureMarkerSymbol pms = new PictureMarkerSymbol((BufferedImage) pointerImage);
+                pms = new PictureMarkerSymbol((BufferedImage) pointerImage);
                 Graphic pointGraphic = new Graphic(point, pms);
                 Graphic lineGraphic = new Graphic(polyline, simpleLineSymbol);
 
                 lineID = graphicsLayer.addGraphic(lineGraphic);
                 pointerID = graphicsLayer.addGraphic(pointGraphic);
+                System.out.println("POINTER ID : " + pointerID);
             }
         });
 
@@ -196,7 +206,8 @@ public class MapDisplay extends JFrame
                         polyline.startPath(GeometryEngine.project(195692.61151359137, 6886509.9789550705, sr));
                         firstUpdate = false;
                         System.out.println(currentLat + " " + currentLong);
-                    } else
+                    }
+                    else
                     {
 
                         point = GeometryEngine.project(currentLat, currentLong, map.getSpatialReference());
@@ -217,17 +228,31 @@ public class MapDisplay extends JFrame
         this.pack();
     }
 
+    /**
+     * Set the current position of the vessel.
+     *
+     * @param currentLat The current latitude of the vessel.
+     * @param currentLong The current longitude of the vessel.
+     */
     public void setCurrentPos(double currentLat, double currentLong)
     {
         this.currentLat = currentLat;
         this.currentLong = currentLong;
     }
 
+    /**
+     * Start the map update timer.
+     */
     public void startTimer()
     {
         timer.start();
     }
 
+    /**
+     * Get the path to the sample data.
+     *
+     * @return The path to the sample data.
+     */
     private String getPathSampleData()
     {
         String dataPath = null;
@@ -240,6 +265,7 @@ public class MapDisplay extends JFrame
             }
             dataPath = javaPath + "sdk" + FSP + "samples" + FSP + "data" + FSP;
         }
+        assert dataPath != null;
         File dataFile = new File(dataPath);
         if (!dataFile.exists())
         {
@@ -248,6 +274,11 @@ public class MapDisplay extends JFrame
         return dataPath;
     }
 
+    /**
+     * Display a given error message in a pop up window.
+     *
+     * @param message The error message to display.
+     */
     private void showErrorMsg(String message)
     {
         JOptionPane.showMessageDialog(null, message, "", JOptionPane.ERROR_MESSAGE);
